@@ -38,12 +38,16 @@ class Tapahtuma(models.Model):
         loppu_teksti = f"{loppu:%d.%m.%Y %H:%M}" if loppu else ""
         return f"{self.otsikko} ({alku:%d.%m.%Y %H:%M} -- {loppu_teksti})"
 
-    def kesto(self) -> datetime.timedelta:
+    @property
+    def kesto(self) -> datetime.timedelta | None:
+        if not self.loppu:
+            return None
         return self.loppu - self.alku
 
-    def kesto_tuntia(self):
-        kesto = self.kesto()
-        return kesto.total_seconds() / 3600
+    @property
+    def kesto_tuntia(self) -> float | None:
+        kesto = self.kesto
+        return kesto.total_seconds() / 3600 if kesto else None
 
     def varaa(self, user):
         """
@@ -62,5 +66,21 @@ class Tapahtuma(models.Model):
         self.osallistujat.add(user)
         return True
 
+    def poista_varaus(self, user):
+        if not self.onko_varattu(user):
+            return
+        self.osallistujat.remove(user)
+
     def onko_varattu(self, user):
+        """
+        Onko tämä tapahtuma varattu annetulle käyttäjälle?
+        """
         return (user in self.osallistujat.all())
+
+    @property
+    def onko_tilaa(self):
+        return self.varauksia < self.paikkoja
+
+    @property
+    def varauksia(self):
+        return self.osallistujat.count()
